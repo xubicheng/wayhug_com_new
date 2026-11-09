@@ -1,0 +1,11 @@
+/target
+/data
+.env
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+/backup
+.DS_Store
+Thumbs.db
+node_modules/
