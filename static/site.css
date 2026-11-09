@@ -1036,12 +1036,6 @@ body.admin {
   margin: 0 0 0.5rem;
 }
 
-.footer-four-note {
-  font-size: 0.8rem;
-  line-height: 1.55;
-  max-width: 24rem;
-}
-
 .site-links {
   list-style: none;
   margin: 0.5rem 0 0;
@@ -1066,16 +1060,16 @@ body.admin {
   text-decoration: underline;
 }
 
-.site-code {
+.footer-filing a {
   display: inline-block;
-  font-family: var(--sans);
-  font-size: 0.66rem;
-  letter-spacing: 0.08em;
-  color: var(--lilac-ink);
-  background: var(--lilac);
-  border-radius: 2px;
-  padding: 0 0.3rem;
-  margin-right: 0.2rem;
+}
+
+.psb-badge {
+  display: inline-block;
+  width: 19px;
+  height: 20px;
+  vertical-align: -0.28em;
+  margin-right: 0.3em;
 }
 
 .footer-bottom {
@@ -1549,7 +1543,7 @@ body.admin {
 
 @media (min-width: 1000px) {
   .footer-grid {
-    grid-template-columns: 1.5fr 1fr 1.7fr 1fr;
+    grid-template-columns: 1.3fr 1fr 1.7fr 1.25fr;
   }
 
   .review-layout {

@@ -85,21 +85,20 @@ pub fn page(
                         }
                         div class="footer-four" {
                             p class="footer-head" { (s.footer_four_title) }
-                            p class="footer-four-note" { (s.footer_four_note) }
                             ul class="site-links" {
                                 li {
                                     a href="https://jshnp.com/" target="_blank" rel="noopener" {
-                                        span class="site-code" { "SJ" } " " (s.site_sj) " ↗"
+                                        (s.site_sj) " ↗"
                                     }
                                 }
                                 li {
                                     a href="https://37xxi.com/" target="_blank" rel="noopener" {
-                                        span class="site-code" { "37" } " " (s.site_37) " ↗"
+                                        (s.site_37) " ↗"
                                     }
                                 }
                                 li {
                                     a href="https://dynsh.com/" target="_blank" rel="noopener" {
-                                        span class="site-code" { "NC" } " " (s.site_nc) " ↗"
+                                        (s.site_nc) " ↗"
                                     }
                                 }
                             }
@@ -109,8 +108,17 @@ pub fn page(
                             p { a href={(format!("/{}/about#privacy", lang.code()))} { (s.footer_privacy) } }
                             p { a href={(format!("/{}/unsubscribe", lang.code()))} { (s.footer_unsubscribe) } }
                             p { (s.footer_ledger) }
-                            p { a href="https://beian.miit.gov.cn/" rel="nofollow noopener" { (s.footer_icp) } }
-                            p { a href="https://www.beian.gov.cn/" rel="nofollow noopener" { (s.footer_psb) } }
+                            p class="footer-filing" {
+                                a href="https://www.beian.gov.cn/" target="_blank" rel="noopener noreferrer" {
+                                    img class="psb-badge" src="/static/police-badge.png"
+                                        srcset="/static/police-badge.png 1x, /static/police-badge@2x.png 2x"
+                                        width="19" height="20" alt=(s.footer_psb_icon_alt) loading="lazy" decoding="async";
+                                    (s.footer_psb)
+                                }
+                            }
+                            p {
+                                a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer" { (s.footer_icp) }
+                            }
                         }
                     }
                     div class="footer-bottom" {
