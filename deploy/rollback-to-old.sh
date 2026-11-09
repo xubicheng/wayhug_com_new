@@ -3,13 +3,15 @@
 # 旧站点目录、旧 binary、旧 systemd 服务都保留未动，回滚只需恢复 Apache 配置并 reload。
 set -euo pipefail
 
-CONF=/etc/apache2/sites-enabled/wayhug.com-le-ssl.conf
+CONF=/etc/apache2/sites-available/wayhug.com-le-ssl.conf
+LINK=/etc/apache2/sites-enabled/wayhug.com-le-ssl.conf
 BACK=/opt/backup/wayhug-new/pre-switch/wayhug.com-le-ssl.conf
 
 [ -f "$BACK" ] || { echo "缺少原始 vhost 备份: $BACK"; exit 1; }
 
 echo "== 1. 恢复原始 vhost =="
 sudo cp "$BACK" "$CONF"
+[ -L "$LINK" ] || sudo ln -sfn ../sites-available/wayhug.com-le-ssl.conf "$LINK"
 sudo apache2ctl configtest
 
 echo "== 2. reload apache =="

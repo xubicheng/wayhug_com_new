@@ -5,7 +5,8 @@
 # /opt/backup/wayhug-new/pre-switch/（含 SHA256SUMS.txt）。
 set -euo pipefail
 
-CONF=/etc/apache2/sites-enabled/wayhug.com-le-ssl.conf
+CONF=/etc/apache2/sites-available/wayhug.com-le-ssl.conf
+LINK=/etc/apache2/sites-enabled/wayhug.com-le-ssl.conf
 BACK=/opt/backup/wayhug-new/pre-switch/wayhug.com-le-ssl.conf
 
 [ -f "$BACK" ] || { echo "缺少切换前备份: $BACK"; exit 1; }
@@ -14,7 +15,9 @@ echo "== 1. 确认新站存活 =="
 curl -fsS -o /dev/null http://127.0.0.1:3005/zh/ || { echo "3005 未就绪，放弃切换"; exit 1; }
 
 echo "== 2. 改 vhost 端口 3002 -> 3005 =="
+# 改 sites-available 里的实体文件，保留 sites-enabled 下的软链接
 sudo sed -i 's#http://127.0.0.1:3002/#http://127.0.0.1:3005/#g' "$CONF"
+[ -L "$LINK" ] || sudo ln -sfn ../sites-available/wayhug.com-le-ssl.conf "$LINK"
 sudo apache2ctl configtest
 
 echo "== 3. reload =="
