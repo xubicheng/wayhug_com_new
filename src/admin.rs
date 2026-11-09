@@ -12,13 +12,25 @@ use crate::util::{self, AppError, sha256_hex};
 
 const ADMIN_COOKIE: &str = "wh_admin";
 
-fn admin_page(title: &str, active: &str, csrf: &str, body: Markup) -> Markup {
+pub(crate) async fn admin_page(
+    st: &AppState,
+    title: &str,
+    active: &str,
+    csrf: &str,
+    body: Markup,
+) -> Markup {
+    let pending: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM note_submissions WHERE status = 'pending'")
+            .fetch_one(&st.db)
+            .await
+            .unwrap_or(0);
     let nav = [
         ("", "概览", "/admin"),
         ("notes", "笔记", "/admin/notes"),
+        ("review", "读者笔记审阅", "/admin/review"),
         ("subscribers", "订阅者", "/admin/subscribers"),
         ("authors", "受邀作者", "/admin/authors"),
-        ("submissions", "投稿审核", "/admin/submissions"),
+        ("submissions", "受邀投稿", "/admin/submissions"),
         ("products", "文创", "/admin/products"),
         ("audit", "审计日志", "/admin/audit"),
         ("outbox", "发件箱", "/admin/outbox"),
@@ -38,7 +50,12 @@ fn admin_page(title: &str, active: &str, csrf: &str, body: Markup) -> Markup {
                     div class="admin-brand" { "wayhug.com 后台" }
                     nav class="admin-nav" {
                         @for (key, label, href) in nav {
-                            a class=(if active == key { "active" } else { "" }) href=(href) { (label) }
+                            a class=(if active == key { "active" } else { "" }) href=(href) {
+                                (label)
+                                @if key == "review" && pending > 0 {
+                                    span class="queue-badge" { (pending) }
+                                }
+                            }
                         }
                     }
                     form method="post" action="/admin/logout" class="logout" {
@@ -108,7 +125,7 @@ async fn find_session(st: &AppState, headers: &HeaderMap) -> Option<SessionRow> 
     Some(row)
 }
 
-async fn guard(st: &AppState, headers: &HeaderMap) -> Result<SessionRow, Response> {
+pub(crate) async fn guard(st: &AppState, headers: &HeaderMap) -> Result<SessionRow, Response> {
     match find_session(st, headers).await {
         Some(s) => Ok(s),
         None => Err((
@@ -119,7 +136,13 @@ async fn guard(st: &AppState, headers: &HeaderMap) -> Result<SessionRow, Respons
     }
 }
 
-async fn audit(db: &sqlx::SqlitePool, action: &str, target: &str, detail: &str, ip: &str) {
+pub(crate) async fn audit(
+    db: &sqlx::SqlitePool,
+    action: &str,
+    target: &str,
+    detail: &str,
+    ip: &str,
+) {
     let _ = sqlx::query(
         "INSERT INTO audit_log (at, actor, action, target, detail, ip) VALUES (?, 'admin', ?, ?, ?, ?)",
     )
@@ -303,7 +326,7 @@ pub async fn dashboard(State(st): State<AppState>, headers: HeaderMap) -> Result
             }
         }
     };
-    Ok(Html(admin_page("概览", "", &sess.csrf, body).into_string()).into_response())
+    Ok(Html(admin_page(&st, "概览", "", &sess.csrf, body).await.into_string()).into_response())
 }
 
 pub async fn notes_list(State(st): State<AppState>, headers: HeaderMap) -> Result<Response, AppError> {
@@ -341,7 +364,7 @@ pub async fn notes_list(State(st): State<AppState>, headers: HeaderMap) -> Resul
             }
         }
     };
-    Ok(Html(admin_page("笔记", "notes", &sess.csrf, body).into_string()).into_response())
+    Ok(Html(admin_page(&st, "笔记", "notes", &sess.csrf, body).await.into_string()).into_response())
 }
 
 #[derive(Deserialize)]
@@ -540,7 +563,7 @@ async fn note_form_page(st: &AppState, session: &SessionRow, note_id: Option<i64
             }
         }
     };
-    Ok(Html(admin_page(title, "notes", &session.csrf, body).into_string()).into_response())
+    Ok(Html(admin_page(&st, title, "notes", &session.csrf, body).await.into_string()).into_response())
 }
 
 pub async fn note_new(State(st): State<AppState>, headers: HeaderMap) -> Result<Response, AppError> {
@@ -659,7 +682,7 @@ pub async fn subscribers(State(st): State<AppState>, headers: HeaderMap) -> Resu
             }
         }
     };
-    Ok(Html(admin_page("订阅者", "subscribers", &sess.csrf, body).into_string()).into_response())
+    Ok(Html(admin_page(&st, "订阅者", "subscribers", &sess.csrf, body).await.into_string()).into_response())
 }
 
 pub async fn subscriber_delete(
@@ -740,7 +763,7 @@ pub async fn authors(State(st): State<AppState>, headers: HeaderMap) -> Result<R
             }
         }
     };
-    Ok(Html(admin_page("受邀作者", "authors", &sess.csrf, body).into_string()).into_response())
+    Ok(Html(admin_page(&st, "受邀作者", "authors", &sess.csrf, body).await.into_string()).into_response())
 }
 
 pub async fn author_create(
@@ -866,7 +889,7 @@ pub async fn author_invite(
         }
         p { a class="btn" href="/admin/authors" { "返回" } }
     };
-    Ok(Html(admin_page("邀请码", "authors", &sess.csrf, body).into_string()).into_response())
+    Ok(Html(admin_page(&st, "邀请码", "authors", &sess.csrf, body).await.into_string()).into_response())
 }
 
 pub async fn submissions(State(st): State<AppState>, headers: HeaderMap) -> Result<Response, AppError> {
@@ -912,7 +935,7 @@ pub async fn submissions(State(st): State<AppState>, headers: HeaderMap) -> Resu
             }
         }
     };
-    Ok(Html(admin_page("投稿审核", "submissions", &sess.csrf, body).into_string()).into_response())
+    Ok(Html(admin_page(&st, "投稿审核", "submissions", &sess.csrf, body).await.into_string()).into_response())
 }
 
 pub async fn submission_approve(
@@ -1061,7 +1084,7 @@ async fn product_form_page(st: &AppState, session: &SessionRow, id: Option<i64>)
             p { button class="btn" type="submit" { "保存" } }
         }
     };
-    Ok(Html(admin_page(title, "products", &session.csrf, body).into_string()).into_response())
+    Ok(Html(admin_page(&st, title, "products", &session.csrf, body).await.into_string()).into_response())
 }
 
 #[derive(Deserialize)]
@@ -1156,7 +1179,7 @@ pub async fn products(State(st): State<AppState>, headers: HeaderMap) -> Result<
             }
         }
     };
-    Ok(Html(admin_page("文创", "products", &sess.csrf, body).into_string()).into_response())
+    Ok(Html(admin_page(&st, "文创", "products", &sess.csrf, body).await.into_string()).into_response())
 }
 
 pub async fn product_new(State(st): State<AppState>, headers: HeaderMap) -> Result<Response, AppError> {
@@ -1240,7 +1263,7 @@ pub async fn audit_page(State(st): State<AppState>, headers: HeaderMap) -> Resul
             }
         }
     };
-    Ok(Html(admin_page("审计日志", "audit", &sess.csrf, body).into_string()).into_response())
+    Ok(Html(admin_page(&st, "审计日志", "audit", &sess.csrf, body).await.into_string()).into_response())
 }
 
 pub async fn outbox(State(st): State<AppState>, headers: HeaderMap) -> Result<Response, AppError> {
@@ -1276,7 +1299,7 @@ pub async fn outbox(State(st): State<AppState>, headers: HeaderMap) -> Result<Re
             }
         }
     };
-    Ok(Html(admin_page("发件箱", "outbox", &sess.csrf, body).into_string()).into_response())
+    Ok(Html(admin_page(&st, "发件箱", "outbox", &sess.csrf, body).await.into_string()).into_response())
 }
 
 pub async fn outbox_view(
@@ -1306,5 +1329,5 @@ pub async fn outbox_view(
         pre class="mail-body" { (body_text) }
         p { a class="btn" href="/admin/outbox" { "返回" } }
     };
-    Ok(Html(admin_page("邮件", "outbox", &sess.csrf, body).into_string()).into_response())
+    Ok(Html(admin_page(&st, "邮件", "outbox", &sess.csrf, body).await.into_string()).into_response())
 }

@@ -83,17 +83,22 @@ pub fn not_found_page(lang: Lang, site_url: &str) -> Response {
         .into_response()
 }
 
-async fn load_notes(
+pub async fn load_notes(
     db: &SqlitePool,
     lang: Lang,
-    readers: bool,
+    section: &str,
     limit: i64,
     offset: i64,
 ) -> Result<Vec<NoteCard>, sqlx::Error> {
-    let filter = if readers {
-        " AND n.guest_author_id IS NOT NULL"
-    } else {
-        " AND n.guest_author_id IS NULL"
+    let filter = match section {
+        "readers" => " AND n.guest_author_id IS NOT NULL",
+        "reader-notes" => {
+            " AND EXISTS (SELECT 1 FROM reader_note_meta m WHERE m.note_id = n.id)"
+        }
+        _ => {
+            " AND n.guest_author_id IS NULL
+              AND NOT EXISTS (SELECT 1 FROM reader_note_meta m WHERE m.note_id = n.id)"
+        }
     };
     let sql = format!(
         "{} {} ORDER BY n.published_at DESC, n.id DESC LIMIT ? OFFSET ?",
@@ -134,8 +139,8 @@ pub async fn home(
         return Ok(not_found_page(Lang::Zh, &st.cfg.site_url));
     };
     let s = lang.s();
-    let notes = load_notes(&st.db, lang, false, 4, 0).await?;
-    let readers = load_notes(&st.db, lang, true, 2, 0).await?;
+    let notes = load_notes(&st.db, lang, "notes", 4, 0).await?;
+    let readers = load_notes(&st.db, lang, "readers", 2, 0).await?;
     let products = load_products(&st.db, lang).await?;
     let (csrf, new) = csrf_for(&headers);
     let notes_href = format!("/{}/notes", lang.code());
@@ -203,7 +208,7 @@ pub async fn notes_index(
     let page = q.page.unwrap_or(1).max(1);
     let limit = 10_i64;
     let offset = (page as i64 - 1) * limit;
-    let mut notes = load_notes(&st.db, lang, false, limit + 1, offset).await?;
+    let mut notes = load_notes(&st.db, lang, "notes", limit + 1, offset).await?;
     let has_next = notes.len() as i64 > limit;
     if has_next {
         notes.truncate(limit as usize);
@@ -268,17 +273,28 @@ async fn neighbor(
     lang: Lang,
     published_at: &str,
     next: bool,
+    section: &str,
 ) -> Result<Option<(String, String)>, sqlx::Error> {
     let cmp = if next { ">" } else { "<" };
     let order = if next { "ASC" } else { "DESC" };
+    let filter = match section {
+        "readers" => " AND n.guest_author_id IS NOT NULL",
+        "reader-notes" => {
+            " AND EXISTS (SELECT 1 FROM reader_note_meta m WHERE m.note_id = n.id)"
+        }
+        _ => {
+            " AND n.guest_author_id IS NULL
+              AND NOT EXISTS (SELECT 1 FROM reader_note_meta m WHERE m.note_id = n.id)"
+        }
+    };
     let sql = format!(
         "SELECT n.slug, COALESCE(t.title, d.title, '') AS title
          FROM notes n
          LEFT JOIN note_i18n t ON t.note_id = n.id AND t.lang = ?
          LEFT JOIN note_i18n d ON d.note_id = n.id AND d.lang = n.lang
-         WHERE n.status = 'published' AND n.published_at {} ?
+         WHERE n.status = 'published' AND n.published_at {} ? {}
          ORDER BY n.published_at {} LIMIT 1",
-        cmp, order
+        cmp, filter, order
     );
     sqlx::query_as::<_, (String, String)>(&sql)
         .bind(lang.code())
@@ -292,7 +308,7 @@ pub async fn note_detail(
     Path((lang, slug)): Path<(String, String)>,
     headers: HeaderMap,
 ) -> Result<Response, AppError> {
-    detail_impl(st, lang, slug, headers, false).await
+    detail_impl(st, lang, slug, headers, "notes").await
 }
 
 pub async fn reader_detail(
@@ -300,15 +316,15 @@ pub async fn reader_detail(
     Path((lang, slug)): Path<(String, String)>,
     headers: HeaderMap,
 ) -> Result<Response, AppError> {
-    detail_impl(st, lang, slug, headers, true).await
+    detail_impl(st, lang, slug, headers, "readers").await
 }
 
-async fn detail_impl(
+pub async fn detail_impl(
     st: AppState,
     lang_raw: String,
     slug: String,
     headers: HeaderMap,
-    readers: bool,
+    section: &str,
 ) -> Result<Response, AppError> {
     let Some(lang) = lang_or_404(&lang_raw) else {
         return Ok(not_found_page(Lang::Zh, &st.cfg.site_url));
@@ -317,24 +333,35 @@ async fn detail_impl(
     let Some(note) = load_note(&st.db, lang, &slug).await? else {
         return Ok(not_found_page(lang, &st.cfg.site_url));
     };
-    if readers != note.guest_author_id.is_some() {
+    let meta = crate::reader_notes::load_meta(&st.db, note.id).await?;
+    let is_reader_note = meta.is_some();
+    let fits = match section {
+        "readers" => note.guest_author_id.is_some() && !is_reader_note,
+        "reader-notes" => is_reader_note,
+        _ => note.guest_author_id.is_none() && !is_reader_note,
+    };
+    if !fits {
         return Ok(not_found_page(lang, &st.cfg.site_url));
     }
 
-    let section = if readers { "readers" } else { "notes" };
     let (csrf, new) = csrf_for(&headers);
     let subscribe_href = format!("/{}/subscribe", lang.code());
     let body_html = crate::md::render(&note.body);
     let minutes = crate::util::reading_minutes(&note.body);
     let published = note.published_at.as_deref().unwrap_or("");
-    let prev = neighbor(&st.db, lang, published, false).await?;
-    let next = neighbor(&st.db, lang, published, true).await?;
+    let prev = neighbor(&st.db, lang, published, false, section).await?;
+    let next = neighbor(&st.db, lang, published, true, section).await?;
     let tags: Vec<&str> = note.tags.split(',').map(|t| t.trim()).filter(|t| !t.is_empty()).collect();
+    let kicker = match section {
+        "readers" => s.nav_readers,
+        "reader-notes" => s.reader_note_kicker,
+        _ => s.nav_notes,
+    };
 
     let content = html! {
         article class="article" {
             header class="article-head" {
-                p class="kicker" { @if readers { (s.nav_readers) } @else { (s.nav_notes) } }
+                p class="kicker" { (kicker) }
                 h1 { (note.title) }
                 p class="note-meta" {
                     time datetime=(published) { (lang.date(published)) }
@@ -354,7 +381,18 @@ async fn detail_impl(
                     (ui::notice("warn", s.fallback_notice))
                 }
             }
+            @if let Some(m) = &meta {
+                (crate::reader_notes::meta_block(lang, m))
+            }
             (ui::prose(&body_html))
+            @if let Some(m) = &meta {
+                @if !m.question.is_empty() {
+                    div class="rn-question" {
+                        h2 { (s.reader_note_question) }
+                        p { (m.question) }
+                    }
+                }
+            }
             @if !tags.is_empty() {
                 p class="tags" {
                     span class="tags-label" { (s.tags_label) "：" }
@@ -363,7 +401,7 @@ async fn detail_impl(
                     }
                 }
             }
-            @if readers {
+            @if section == "readers" {
                 p class="license" { (note.license.clone().unwrap_or_else(|| s.readers_license.to_string())) }
             }
             nav class="pager" {
@@ -397,7 +435,7 @@ pub async fn readers_index(
         return Ok(not_found_page(Lang::Zh, &st.cfg.site_url));
     };
     let s = lang.s();
-    let notes = load_notes(&st.db, lang, true, 50, 0).await?;
+    let notes = load_notes(&st.db, lang, "readers", 50, 0).await?;
     let content = html! {
         section class="narrow" {
             h1 { (s.readers_title) }
@@ -434,7 +472,7 @@ pub async fn about(
                 li { (s.about_money_2) }
                 li { (s.about_money_3) }
             }
-            h2 { (s.about_privacy_title) }
+            h2 id="privacy" { (s.about_privacy_title) }
             p { (s.about_privacy) }
             h2 { (s.about_contact_title) }
             p { (s.about_contact) }
@@ -522,21 +560,29 @@ pub async fn robots() -> Response {
 }
 
 pub async fn sitemap(State(st): State<AppState>) -> Result<Response, AppError> {
-    let rows: Vec<(String, Option<String>)> =
-        sqlx::query_as("SELECT slug, published_at FROM notes WHERE status = 'published' ORDER BY published_at DESC")
-            .fetch_all(&st.db)
-            .await?;
+    let rows: Vec<(String, Option<String>, i64)> = sqlx::query_as(
+        "SELECT n.slug, n.published_at,
+                CASE WHEN EXISTS (SELECT 1 FROM reader_note_meta m WHERE m.note_id = n.id)
+                     THEN 1 ELSE 0 END AS is_reader_note
+         FROM notes n WHERE n.status = 'published' ORDER BY n.published_at DESC",
+    )
+    .fetch_all(&st.db)
+    .await?;
     let base = st.cfg.site_url.trim_end_matches('/');
     let mut xml = String::from(
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n",
     );
     for lang in ["zh", "en"] {
-        for path in ["", "notes", "readers", "products", "about", "subscribe"] {
+        for path in ["", "notes", "reader-notes", "readers", "products", "about", "subscribe"] {
             let loc = format!("{}/{}/{}", base, lang, path);
             xml.push_str(&format!("<url><loc>{}</loc></url>\n", loc));
         }
-        for (slug, _) in &rows {
-            xml.push_str(&format!("<url><loc>{}/{}/notes/{}</loc></url>\n", base, lang, slug));
+        for (slug, _, is_reader_note) in &rows {
+            let section = if *is_reader_note == 1 { "reader-notes" } else { "notes" };
+            xml.push_str(&format!(
+                "<url><loc>{}/{}/{}/{}</loc></url>\n",
+                base, lang, section, slug
+            ));
         }
     }
     xml.push_str("</urlset>\n");

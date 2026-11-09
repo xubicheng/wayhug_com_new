@@ -22,5 +22,8 @@ pub async fn init(url: &str) -> anyhow::Result<SqlitePool> {
     sqlx::raw_sql(include_str!("../migrations/0002_seed.sql"))
         .execute(&pool)
         .await?;
+    sqlx::raw_sql(include_str!("../migrations/0003_reader_notes.sql"))
+        .execute(&pool)
+        .await?;
     Ok(pool)
 }

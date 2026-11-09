@@ -21,6 +21,10 @@ pub struct Config {
     pub cookie_secure: bool,
     pub database_url: String,
     pub smtp: Smtp,
+    /// 有新读书笔记提交时，给站长发通知邮件；默认关闭。
+    pub submit_notify: bool,
+    /// 提交时用第三方 IP 库解析一次粗略归属地（只保存归属地，不保存 IP）。
+    pub ip_geo: bool,
 }
 
 fn var(key: &str, default: &str) -> String {
@@ -58,6 +62,8 @@ impl Config {
                 from: var("SMTP_FROM", "wayhug.com <xubicheng@qq.com>"),
                 enabled: mail_enabled,
             },
+            submit_notify: var("SUBMIT_NOTIFY", "0") == "1",
+            ip_geo: var("IP_GEO", "0") == "1",
         })
     }
 }

@@ -6,6 +6,8 @@ mod mail;
 mod md;
 mod models;
 mod public;
+mod reader_notes;
+mod review;
 mod subscribe;
 mod ui;
 mod util;
@@ -75,6 +77,13 @@ async fn main() -> anyhow::Result<()> {
         .route("/{lang}/notes/{slug}", get(public::note_detail))
         .route("/{lang}/readers", get(public::readers_index))
         .route("/{lang}/readers/{slug}", get(public::reader_detail))
+        .route("/{lang}/reader-notes", get(reader_notes::index))
+        .route(
+            "/{lang}/reader-notes/submit",
+            get(reader_notes::submit_page).post(reader_notes::submit),
+        )
+        .route("/{lang}/reader-notes/{slug}", get(reader_notes::detail))
+        .route("/{lang}/unsubscribe", get(reader_notes::unsubscribe_page))
         .route("/{lang}/about", get(public::about))
         .route("/{lang}/products", get(public::products))
         .route(
@@ -123,6 +132,10 @@ async fn main() -> anyhow::Result<()> {
             "/admin/products/{id}",
             get(admin::product_edit).post(admin::product_update),
         )
+        .route("/admin/review", get(review::workbench))
+        .route("/admin/review/{id}/decide", post(review::decide))
+        .route("/admin/review/batch-reject", post(review::batch_reject))
+        .route("/admin/review/preview", post(review::preview))
         .route("/admin/audit", get(admin::audit_page))
         .route("/admin/outbox", get(admin::outbox))
         .route("/admin/outbox/{id}", get(admin::outbox_view))

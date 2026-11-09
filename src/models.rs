@@ -121,6 +121,70 @@ pub struct AdminNoteRow {
     pub guest_author_id: Option<i64>,
 }
 
+#[derive(FromRow, Clone)]
+pub struct SubmissionRow2 {
+    pub id: i64,
+    pub receipt: String,
+    pub occurred_at: String,
+    pub weekday: Option<i64>,
+    pub place: String,
+    pub weather: String,
+    pub temp_c: String,
+    pub book_title: String,
+    pub isbn: String,
+    pub title: String,
+    pub body: String,
+    pub question: String,
+    pub color: String,
+    pub flag: String,
+    pub links: String,
+    pub lang: String,
+    pub status: String,
+    pub ip_hash: String,
+    pub ip_region: String,
+    pub created_at: String,
+    pub reviewed_at: Option<String>,
+    pub reviewer: Option<String>,
+    pub reject_reason: Option<String>,
+    pub review_note: Option<String>,
+    pub note_id: Option<i64>,
+    pub original_json: String,
+    pub edited_at: Option<String>,
+    pub edited_by: Option<String>,
+}
+
+impl SubmissionRow2 {
+    pub fn words(&self) -> usize {
+        self.title.chars().count() + self.body.chars().count() + self.question.chars().count()
+    }
+
+    pub fn status_label(&self) -> &'static str {
+        match self.status.as_str() {
+            "accepted" => "已采纳",
+            "rejected" => "已退回",
+            _ => "待审",
+        }
+    }
+}
+
+#[derive(FromRow, Clone)]
+pub struct ReaderMeta {
+    pub note_id: i64,
+    pub submission_id: i64,
+    pub occurred_at: String,
+    pub weekday: Option<i64>,
+    pub place: String,
+    pub weather: String,
+    pub temp_c: String,
+    pub book_title: String,
+    pub isbn: String,
+    pub question: String,
+    pub color: String,
+    pub flag: String,
+    pub links: String,
+    pub created_at: String,
+}
+
 #[derive(Serialize)]
 pub struct PublicNote {
     pub slug: String,

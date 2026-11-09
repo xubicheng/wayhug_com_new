@@ -52,6 +52,7 @@ pub fn page(
                         }
                         nav class="nav" aria-label="导航 / Navigation" {
                             a class=(if active == "notes" { "active" } else { "" }) href={(format!("/{}/notes", lang.code()))} { (s.nav_notes) }
+                            a class=(if active == "reader-notes" { "active" } else { "" }) href={(format!("/{}/reader-notes", lang.code()))} { (s.nav_reader_notes) }
                             a class=(if active == "readers" { "active" } else { "" }) href={(format!("/{}/readers", lang.code()))} { (s.nav_readers) }
                             a class=(if active == "products" { "active" } else { "" }) href={(format!("/{}/products", lang.code()))} { (s.nav_products) }
                             a class=(if active == "about" { "active" } else { "" }) href={(format!("/{}/about", lang.code()))} { (s.nav_about) }
@@ -63,16 +64,50 @@ pub fn page(
                 main id="main" class="wrap" { (content) }
                 footer class="site-footer" {
                     div class="footer-grid" {
-                        div {
+                        div class="footer-brand-col" {
+                            a class="footer-mark" href=(home) {
+                                picture {
+                                    source type="image/avif" srcset="/static/brand-mark.avif 1x, /static/brand-mark@2x.avif 2x";
+                                    source type="image/webp" srcset="/static/brand-mark.webp 1x, /static/brand-mark@2x.webp 2x";
+                                    img src="/static/brand-mark.png" width="160" height="90" alt=(s.footer_brand_alt) loading="lazy" decoding="async";
+                                }
+                            }
                             p class="footer-brand" { "王元会 · wayhug.com" }
                             p class="footer-note" { (s.footer_note) }
                         }
                         div {
-                            p { a href={(format!("/{}/about", lang.code()))} { (s.nav_about) } }
+                            p class="footer-head" { (if lang == Lang::Zh { "站内" } else { "On this site" }) }
+                            p { a href={(format!("/{}/notes", lang.code()))} { (s.nav_notes) } }
+                            p { a href={(format!("/{}/reader-notes", lang.code()))} { (s.nav_reader_notes) } }
+                            p { a href={(format!("/{}/readers", lang.code()))} { (s.nav_readers) } }
                             p { a href={(format!("/{}/products", lang.code()))} { (s.nav_products) } }
-                            p { a href={(format!("/{}/subscribe", lang.code()))} { (s.nav_subscribe) } }
+                            p { a href={(format!("/{}/about", lang.code()))} { (s.nav_about) } }
+                        }
+                        div class="footer-four" {
+                            p class="footer-head" { (s.footer_four_title) }
+                            p class="footer-four-note" { (s.footer_four_note) }
+                            ul class="site-links" {
+                                li {
+                                    a href="https://jshnp.com/" target="_blank" rel="noopener" {
+                                        span class="site-code" { "SJ" } " " (s.site_sj) " ↗"
+                                    }
+                                }
+                                li {
+                                    a href="https://37xxi.com/" target="_blank" rel="noopener" {
+                                        span class="site-code" { "37" } " " (s.site_37) " ↗"
+                                    }
+                                }
+                                li {
+                                    a href="https://dynsh.com/" target="_blank" rel="noopener" {
+                                        span class="site-code" { "NC" } " " (s.site_nc) " ↗"
+                                    }
+                                }
+                            }
                         }
                         div class="footer-meta" {
+                            p { a href={(format!("/{}/subscribe", lang.code()))} { (s.nav_subscribe) } }
+                            p { a href={(format!("/{}/about#privacy", lang.code()))} { (s.footer_privacy) } }
+                            p { a href={(format!("/{}/unsubscribe", lang.code()))} { (s.footer_unsubscribe) } }
                             p { (s.footer_ledger) }
                             p { a href="https://beian.miit.gov.cn/" rel="nofollow noopener" { (s.footer_icp) } }
                             p { a href="https://www.beian.gov.cn/" rel="nofollow noopener" { (s.footer_psb) } }
@@ -80,6 +115,8 @@ pub fn page(
                     }
                     div class="footer-bottom" {
                         span { "© " (chrono::Utc::now().format("%Y")) " " (s.footer_rights) }
+                        span class="footer-dot" { "·" }
+                        a href=(home) { "wayhug.com" }
                     }
                 }
                 script src="/static/enhance.js" defer {}
@@ -191,7 +228,7 @@ pub fn subscribe_form(lang: Lang, csrf: &str, action: &str) -> Markup {
                 input type="checkbox" name="consent" value="1" required;
                 span { (s.consent_label) }
             }
-            button class="btn" type="submit" { (s.button_subscribe) }
+            button class="btn btn-primary" type="submit" { (s.button_subscribe) }
             p class="hint" { (s.consent_hint) }
             p class="hint" { (s.subscribe_privacy) }
         }
