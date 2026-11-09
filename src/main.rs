@@ -13,6 +13,7 @@ mod util;
 use std::sync::Arc;
 
 use axum::Router;
+use axum::response::Redirect;
 use axum::http::header::{HeaderName, HeaderValue};
 use axum::routing::{get, post};
 use sqlx::SqlitePool;
@@ -63,6 +64,10 @@ async fn main() -> anyhow::Result<()> {
         .route("/", get(public::root))
         .route("/healthz", get(public::healthz))
         .route("/robots.txt", get(public::robots))
+        .route(
+            "/favicon.ico",
+            get(|| async { Redirect::permanent("/static/favicon.svg") }),
+        )
         .route("/sitemap.xml", get(public::sitemap))
         .route("/api/notes", get(public::api_notes))
         .route("/{lang}/", get(public::home))

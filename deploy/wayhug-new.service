@@ -1,0 +1,21 @@
+[Unit]
+Description=wayhug.com new site (axum, 127.0.0.1:3005)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/opt/wayhug-new
+EnvironmentFile=/opt/wayhug-new/.env
+ExecStart=/opt/wayhug-new/target/release/wayhug-new
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+StandardOutput=append:/opt/wayhug-new/logs/app.log
+StandardError=append:/opt/wayhug-new/logs/app.err.log
+
+[Install]
+WantedBy=multi-user.target

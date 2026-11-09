@@ -9,6 +9,7 @@
   --brand-deep: #3f6a86;
   --brand-wash: #eef3f6;
   --warm: #a8794a;
+  --warm-ink: #75512a;
   --warm-wash: #f7f1e7;
   --ok: #3f6a49;
   --danger: #9b3d33;
@@ -654,7 +655,7 @@ textarea:focus {
 }
 
 .revenue strong {
-  color: var(--warm);
+  color: var(--warm-ink);
   font-weight: 600;
 }
 
